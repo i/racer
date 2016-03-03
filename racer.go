@@ -20,11 +20,10 @@ type Racer func(chan struct{}) (interface{}, error)
 
 type Options struct {
 	Timeout time.Duration
-	Delay   time.Duration
 	Kill    chan struct{}
 }
 
-func Race(opts *Options, racers ...Racer) (interface{}, error) {
+func Race(opts *Options, racers ...Racer) (res interface{}, err error) {
 	if len(racers) == 0 {
 		return nil, errNoRacers
 	}
@@ -33,7 +32,6 @@ func Race(opts *Options, racers ...Racer) (interface{}, error) {
 	defer close(done)
 
 	cases := make([]reflect.SelectCase, 0, len(racers)+10)
-
 	for _, r := range racers {
 		cases = append(cases, newCase(r, done))
 	}
@@ -46,9 +44,19 @@ func Race(opts *Options, racers ...Racer) (interface{}, error) {
 		cases = append(cases, newCase(newKillRacer(opts.Kill), done))
 	}
 
-	_, val, _ := reflect.Select(cases)
-	res := val.Interface().(result)
-	return res.res, res.err
+	for {
+		i, val, _ := reflect.Select(cases)
+		res := val.Interface().(result)
+
+		if res.err != nil {
+			if res.err == ErrKilled || res.err == ErrTimeout {
+				return nil, res.err
+			}
+			cases = append(cases[:i], cases[i+1:]...)
+			continue
+		}
+		return res.res, nil
+	}
 }
 
 func newCase(r Racer, done chan struct{}) reflect.SelectCase {

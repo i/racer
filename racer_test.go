@@ -1,6 +1,7 @@
 package racer
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,6 +21,25 @@ func TestRace(t *testing.T) {
 	res, err := Race(nil, slowFn, fastFn)
 	assert.NoError(t, err)
 	assert.Equal(t, "I'm fast", res)
+}
+
+func TestFailures(t *testing.T) {
+	failureFn := func(chan struct{}) (interface{}, error) {
+		return nil, fmt.Errorf("I failed")
+	}
+	slowlyButSurely := func(chan struct{}) (interface{}, error) {
+		time.Sleep(time.Millisecond)
+		return true, nil
+	}
+
+	var racers []Racer
+	for i := 0; i < 10; i++ {
+		racers = append(racers, failureFn)
+	}
+	racers = append(racers, slowlyButSurely)
+	res, err := Race(nil, racers...)
+	assert.NoError(t, err)
+	assert.Equal(t, true, res)
 }
 
 func TestRaceNoRacers(t *testing.T) {
