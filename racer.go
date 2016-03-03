@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Errors returned by racer
 var (
 	ErrTimeout = errors.New("all operations timed out")
 	ErrKilled  = errors.New("all operations were killed")
@@ -16,13 +17,24 @@ var (
 	errNoRacers = errors.New("no racers")
 )
 
-type Racer func(chan struct{}) (interface{}, error)
+// Racer is defined as a function that respects a done channel and returns an
+// interface and an error. The done channel is closed when the race is
+// considered to be over. This happens when another function successfully
+// finishes without an error or some other condition is met (such as a timeout).
+type Racer func(done chan struct{}) (result interface{}, err error)
 
+// Options is a list of optional params to a race.
 type Options struct {
+	// Timeout the maximum time to wait before ending the race.
 	Timeout time.Duration
-	Kill    chan struct{}
+	// Kill is a channel to signal all racers to stop. Close it to end the race.
+	Kill chan struct{}
 }
 
+// Race starts a race between multiple racers. It works by calling each of the
+// racers and waiting until one of them successfully finishes execution or a
+// stopping condition is met. Racers that return a non-nil zero are
+// disqualified and the race keeps going.
 func Race(opts *Options, racers ...Racer) (res interface{}, err error) {
 	if len(racers) == 0 {
 		return nil, errNoRacers
