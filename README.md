@@ -5,45 +5,23 @@ make function calls race each other
 ## usage
 
 ```go
-tryBitly := func(done chan struct{}) (interface{}, error) {
-  req, err := http.NewRequest("GET", "http://bit.ly/IqT6zt", nil) (*Request, error)
-  req.Cancel = done
-  res, err := http.DefaultClient.Do(req)
-  if err != nil {
-    return err
-  }
-  defer res.Body.Close()
 
-  _, err := io.Copy(ioutil.Discard, res.Body)
-  if err != nil {
-    return nil, err
-  }
+res, err := racer.Race(
+  racer.Options,
+  func(chan struct{}) (interface{}, error) {
+    time.Sleep(time.Second)
+    return "yo", nil
+  },
+  func(chan struct{}) (interface{}, error) {
+    return nil, fmt.Errorf("dang")
+  },
+  func(chan struct{}) (interface{}, error) {
+    time.Sleep(time.Millisecond*50)
+    return "OK", nil
+  },
+)
 
-  return "bitly was faster", nil
-}
-
-tryOwly := func(done chan struct{}) (interface{}, error) {
-  req, err := http.NewRequest("GET", "http://ow.ly/Z0UXu", nil) (*Request, error)
-  req.Cancel = done
-  res, err := http.DefaultClient.Do(req)
-  if err != nil {
-    return err
-  }
-  defer res.Body.Close()
-
-  _, err := io.Copy(ioutil.Discard, res.Body)
-  if err != nil {
-    return nil, err
-  }
-
-  return "owly was faster", nil
-}
-
-opts := &racer.Options{
-  Timeout: time.Second,
-}
-
-res, err := racer.Race(racer.Options, fn1, fn2)
+fmt.Println(res, err) // OK, nil
 
 ```
 
